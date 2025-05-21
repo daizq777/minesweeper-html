@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>优化版超大规模扫雷</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        :root {
+            --cell-size: 30px;
+            --cell-border: 1px solid #999;
+            --cell-bg: #ddd;
+            --revealed-bg: #fff;
+            --flagged-bg: #f99;
+            --mine-bg: #f00;
+            --text-color: #333;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            touch-action: manipulation;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: calc(100vh - 60px);
+            overflow: auto;
+            background-color: #f0f0f0;
+        }
+        
+        #minefield {
+            position: absolute;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            min-width: var(--cell-size);
+            min-height: var(--cell-size);
+            max-width: var(--cell-size);
+            max-height: var(--cell-size);
+            border: var(--cell-border);
+            text-align: center;
+            vertical-align: middle;
+            font-weight: bold;
+            font-size: calc(var(--cell-size) * 0.6);
+            background-color: var(--cell-bg);
+            user-select: none;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: background-color 0.2s;
+        }
+        
+        .cell.revealed {
+            background-color: var(--revealed-bg);
+        }
+        
+        .cell.flagged {
+            background-color: var(--flagged-bg);
+        }
+        
+        .cell.mine {
+            background-color: var(--mine-bg);
+        }
+        
+        .cell.mine::after {
+            content: "💣";
+            font-size: calc(var(--cell-size) * 0.8);
+            line-height: var(--cell-size);
+        }
+        
+        .cell.flagged::after {
+            content: "🚩";
+            font-size: calc(var(--cell-size) * 0.8);
+            line-height: var(--cell-size);
+        }
+        
+        #controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background-color: #333;
+            color: white;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 10px;
+            box-sizing: border-box;
+            z-index: 100;
+        }
+        
+        #controls button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        
+        #controls button:active {
+            background-color: #3e8e41;
+        }
+        
+        #stats {
+            font-size: 16px;
+            color: white;
+        }
+        
+        #zoom-controls {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #zoom-controls button {
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .number-1 { color: blue; }
+        .number-2 { color: green; }
+        .number-3 { color: red; }
+        .number-4 { color: darkblue; }
+        .number-5 { color: brown; }
+        .number-6 { color: teal; }
+        .number-7 { color: black; }
+        .number-8 { color: gray; }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <table id="minefield"></table>
+    </div>
+    
+    <div id="controls">
+        <button id="new-game">新游戏</button>
+        <div id="stats">
+            剩余雷数: <span id="mines-left">0</span> | 
+            已标记: <span id="flags-placed">0</span>
+        </div>
+        <div id="zoom-controls">
+            <button id="zoom-in">+</button>
+            <button id="zoom-out">-</button>
+        </div>
+    </div>
+
+    <script>
+        // 游戏配置
+        const config = {
+            width: 500,   // 地图宽度(单元格数)
+            height: 500,  // 地图高度(单元格数)
+            mines: 10000,  // 雷数(10万颗在移动设备上性能可能不足，改为1万)
+            baseCellSize: 30 // 基础单元格大小(px)
+        };
+        
+        // 当前缩放级别
+        let currentZoom = 1;
+
+        // 游戏状态
+        let gameState = {
+            minefield: null,
+            revealed: null,
+            flagged: null,
+            gameOver: false,
+            firstClick: true,
+            flagsPlaced: 0
+        };
+
+        // 初始化游戏
+        function initGame() {
+            const minefield = document.getElementById('minefield');
+            minefield.innerHTML = '';
+            
+            // 设置单元格大小
+            updateCellSize();
+            
+            // 创建游戏状态数组
+            gameState.minefield = new Array(config.height);
+            gameState.revealed = new Array(config.height);
+            gameState.flagged = new Array(config.height);
+            gameState.flagsPlaced = 0;
+            
+            for (let y = 0; y < config.height; y++) {
+                gameState.minefield[y] = new Array(config.width).fill(0);
+                gameState.revealed[y] = new Array(config.width).fill(false);
+                gameState.flagged[y] = new Array(config.width).fill(false);
+                
+                const row = minefield.insertRow();
+                for (let x = 0; x < config.width; x++) {
+                    const cell = row.insertCell();
+                    cell.className = 'cell';
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+                    
+                    // 添加事件监听
+                    cell.addEventListener('click', handleCellClick);
+                    cell.addEventListener('contextmenu', handleRightClick);
+                    cell.addEventListener('touchstart', handleTouchStart, {passive: false});
+                    cell.addEventListener('touchend', handleTouchEnd);
+                }
+            }
+            
+            gameState.gameOver = false;
+            gameState.firstClick = true;
+            updateStats();
+            
+            // 自动滚动到中心
+            setTimeout(() => {
+                minefield.style.left = '50%';
+                minefield.style.top = '50%';
+                minefield.style.transform = 'translate(-50%, -50%)';
+            }, 100);
+        }
+        
+        // 更新单元格大小
+        function updateCellSize() {
+            const size = config.baseCellSize * currentZoom;
+            document.documentElement.style.setProperty('--cell-size', `${size}px`);
+        }
+
+        // 放置地雷(确保第一次点击安全)
+        function placeMines(safeX, safeY) {
+            let minesPlaced = 0;
+            
+            // 创建安全区域(第一次点击周围3x3区域不放雷)
+            const safeZone = [];
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const x = safeX + dx;
+                    const y = safeY + dy;
+                    if (x >= 0 && x < config.width && y >= 0 && y < config.height) {
+                        safeZone.push(`${x},${y}`);
+                    }
+                }
+            }
+            
+            // 随机放置地雷
+            while (minesPlaced < config.mines) {
+                const x = Math.floor(Math.random() * config.width);
+                const y = Math.floor(Math.random() * config.height);
+                
+                // 检查是否在安全区域或已有雷
+                if (!safeZone.includes(`${x},${y}`) && gameState.minefield[y][x] !== -1) {
+                    gameState.minefield[y][x] = -1; // -1表示雷
+                    minesPlaced++;
+                    
+                    // 更新周围单元格的数字
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const nx = x + dx;
+                            const ny = y + dy;
+                            if (nx >= 0 && nx < config.width && ny >= 0 && ny < config.height && gameState.minefield[ny][nx] !== -1) {
+                                gameState.minefield[ny][nx]++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 处理单元格点击
+        function handleCellClick(event) {
+            if (gameState.gameOver) return;
+            
+            const cell = event.currentTarget;
+            const x = parseInt(cell.dataset.x);
+            const y = parseInt(cell.dataset.y);
+            
+            if (gameState.flagged[y][x]) return;
+            
+            if (gameState.firstClick) {
+                placeMines(x, y);
+                gameState.firstClick = false;
+            }
+            
+            revealCell(x, y);
+            
+            if (gameState.minefield[y][x] === -1) {
+                // 踩到雷，游戏结束
+                gameOver(false);
+            } else if (checkWin()) {
+                // 检查是否胜利
+                gameOver(true);
+            }
+        }
+        
+        // 触摸开始处理(用于阻止滚动)
+        function handleTouchStart(event) {
+            if (event.touches.length === 1) {
+                event.preventDefault();
+            }
+        }
+        
+        // 触摸结束处理(模拟右键点击)
+        function handleTouchEnd(event) {
+            if (event.touches.length === 0 && event.changedTouches.length === 1) {
+                const touch = event.changedTouches[0];
+                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (element && element.classList.contains('cell')) {
+                    // 长按视为右键点击
+                    handleRightClick({currentTarget: element, preventDefault: () => {}});
+                }
+            }
+        }
+
+        // 处理右键点击(插旗)
+        function handleRightClick(event) {
+            event.preventDefault();
+            if (gameState.gameOver || gameState.firstClick) return;
+            
+            const cell = event.currentTarget;
+            const x = parseInt(cell.dataset.x);
+            const y = parseInt(cell.dataset.y);
+            
+            if (!gameState.revealed[y][x]) {
+                gameState.flagged[y][x] = !gameState.flagged[y][x];
+                if (gameState.flagged[y][x]) {
+                    gameState.flagsPlaced++;
+                } else {
+                    gameState.flagsPlaced--;
+                }
+                cell.className = gameState.flagged[y][x] ? 'cell flagged' : 'cell';
+                updateStats();
+            }
+        }
+
+        // 揭示单元格
+        function revealCell(x, y) {
+            if (x < 0 || x >= config.width || y < 0 || y >= config.height || 
+                gameState.revealed[y][x] || gameState.flagged[y][x]) {
+                return;
+            }
+            
+            gameState.revealed[y][x] = true;
+            const cell = document.getElementById('minefield').rows[y].cells[x];
+            cell.classList.add('revealed');
+            
+            if (gameState.minefield[y][x] > 0) {
+                // 显示周围雷数
+                cell.textContent = gameState.minefield[y][x];
+                cell.classList.add(`number-${gameState.minefield[y][x]}`);
+            } else if (gameState.minefield[y][x] === 0) {
+                // 如果是空白单元格，自动揭示周围
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (dx !== 0 || dy !== 0) {
+                            revealCell(x + dx, y + dy);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 游戏结束处理
+        function gameOver(win) {
+            gameState.gameOver = true;
+            
+            // 揭示所有雷
+            for (let y = 0; y < config.height; y++) {
+                for (let x = 0; x < config.width; x++) {
+                    if (gameState.minefield[y][x] === -1) {
+                        const cell = document.getElementById('minefield').rows[y].cells[x];
+                        cell.classList.add('mine');
+                    }
+                }
+            }
+            
+            setTimeout(() => {
+                alert(win ? '恭喜你赢了！' : '游戏结束！你踩到雷了！');
+            }, 100);
+        }
+
+        // 检查是否胜利
+        function checkWin() {
+            let unrevealedSafeCells = 0;
+            
+            for (let y = 0; y < config.height; y++) {
+                for (let x = 0; x < config.width; x++) {
+                    if (!gameState.revealed[y][x] && gameState.minefield[y][x] !== -1) {
+                        unrevealedSafeCells++;
+                    }
+                }
+            }
+            
+            return unrevealedSafeCells === 0;
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            if (gameState.firstClick) {
+                document.getElementById('mines-left').textContent = config.mines;
+                document.getElementById('flags-placed').textContent = '0';
+                return;
+            }
+            
+            document.getElementById('mines-left').textContent = config.mines - gameState.flagsPlaced;
+            document.getElementById('flags-placed').textContent = gameState.flagsPlaced;
+        }
+        
+        // 缩放控制
+        function zoomIn() {
+            if (currentZoom < 2) {
+                currentZoom += 0.1;
+                updateCellSize();
+            }
+        }
+        
+        function zoomOut() {
+            if (currentZoom > 0.5) {
+                currentZoom -= 0.1;
+                updateCellSize();
+            }
+        }
+
+        // 初始化游戏
+        document.getElementById('new-game').addEventListener('click', initGame);
+        document.getElementById('zoom-in').addEventListener('click', zoomIn);
+        document.getElementById('zoom-out').addEventListener('click', zoomOut);
+        
+        // 初始化触摸事件监听器
+        document.addEventListener('touchmove', function(e) {
+            if (e.touches.length === 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        initGame();
+    </script>
+</body>
+</html>
