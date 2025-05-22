@@ -30,12 +30,18 @@
             height: calc(100vh - 60px);
             overflow: auto;
             background-color: #f0f0f0;
+            /* 添加内边距确保边缘单元格完整显示 */
+            padding: 20px;
+            box-sizing: border-box;
         }
         
         #minefield {
             position: absolute;
             border-collapse: collapse;
             table-layout: fixed;
+            /* 确保表格从容器内边距开始渲染 */
+            left: 20px;
+            top: 20px;
         }
         
         .cell {
@@ -56,7 +62,6 @@
             box-sizing: border-box;
             transition: background-color 0.2s;
         }
-        
         .cell.revealed {
             background-color: var(--revealed-bg);
         }
@@ -219,9 +224,14 @@
             
             // 自动滚动到中心
             setTimeout(() => {
-                minefield.style.left = '50%';
-                minefield.style.top = '50%';
-                minefield.style.transform = 'translate(-50%, -50%)';
+                const container = document.getElementById('game-container');
+                const minefield = document.getElementById('minefield');
+                
+                // 计算中心位置时考虑内边距
+                const centerX = (container.clientWidth - minefield.offsetWidth) / 2;
+                const centerY = (container.clientHeight - minefield.offsetHeight) / 2;
+                
+                container.scrollTo(centerX, centerY);
             }, 100);
         }
         
