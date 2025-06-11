@@ -141,7 +141,36 @@
             content: " ▲";
             font-size: 12px;
         }
+        /* 搜索页面样式 */
+        .search-box {
+            display: flex;
+            margin-bottom: 20px;
+        }
         
+        .search-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px 0 0 5px;
+            font-family: 'Libre Baskerville', serif;
+        }
+        
+        .search-btn {
+            padding: 10px 20px;
+            background-color: #1a3a5f;
+            color: white;
+            border: none;
+            border-radius: 0 5px 5px 0;
+            cursor: pointer;
+            font-family: 'Playfair Display', serif;
+        }
+        
+        .search-results .post {
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 3px solid #1a3a5f;
+            background-color: #f9f9f9;
+        }
         /* 个人主页 */
         .profile {
             display: flex;
@@ -349,9 +378,23 @@
     <div class="navbar">
         <a href="#" class="nav-link" data-page="welcome">Welcome</a>
         <a href="#" class="nav-link" data-page="post">Post</a>
-        <a href="#" class="nav-link" data-page="help">Help</a>
+        <a href="#" class="nav-link" data-page="search">Search</a> <!-- 修改为Search -->
         <a href="#" class="nav-link" data-page="about">About</a>
     </div>
+    
+    <!-- 搜索页面 -->
+    <div class="container page" id="search">
+        <h1>Search Posts</h1>
+        <div class="search-box">
+            <input type="text" class="search-input" id="search-input" placeholder="Enter keywords to search...">
+            <button class="search-btn" onclick="searchPosts()">Search</button>
+        </div>
+        
+        <div class="search-results" id="search-results">
+            <!-- 搜索结果将在这里显示 -->
+        </div>
+    </div>
+    
     
     <!-- 欢迎/个人主页 -->
     <div class="container page" id="welcome">
@@ -770,6 +813,38 @@
         document.getElementById('post-content').addEventListener('input', function() {
             localStorage.setItem('draftPost', this.value);
         });
+        // 搜索帖子功能
+        function searchPosts() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const resultsContainer = document.getElementById('search-results');
+            resultsContainer.innerHTML = '';
+            
+            if (!query) {
+                resultsContainer.innerHTML = '<p>Please enter a search term</p>';
+                return;
+            }
+            
+            const posts = JSON.parse(localStorage.getItem('posts')) || [];
+            const filteredPosts = posts.filter(post => 
+                post.content.toLowerCase().includes(query) || 
+                post.time.toLowerCase().includes(query)
+            );
+            
+            if (filteredPosts.length === 0) {
+                resultsContainer.innerHTML = '<p>No posts found matching your search</p>';
+                return;
+            }
+            
+            filteredPosts.forEach(post => {
+                const postElement = document.createElement('div');
+                postElement.className = 'post';
+                postElement.innerHTML = `
+                    <div class="post-time"><i>${post.time}</i></div>
+                    <div class="post-content">${post.content}</div>
+                `;
+                resultsContainer.appendChild(postElement);
+            });
+        }
     </script>
 </body>
 </html>
