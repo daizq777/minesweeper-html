@@ -1,453 +1,775 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>优化版超大规模扫雷</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zuckonit</title>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Playfair+Display:wght@400;700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --cell-size: 30px;
-            --cell-border: 1px solid #999;
-            --cell-bg: #ddd;
-            --revealed-bg: #fff;
-            --flagged-bg: #f99;
-            --mine-bg: #f00;
-            --text-color: #333;
+        /* 基础样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
         
         body {
-            margin: 0;
-            padding: 0;
-            touch-action: manipulation;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
+            background-color: #f5f5f5;
+            color: #333;
+            font-family: 'Libre Baskerville', serif;
         }
         
-        #game-container {
-            position: relative;
-            width: 100vw;
-            height: calc(100vh - 60px);
-            overflow: auto;
-            background-color: #f0f0f0;
-            /* 添加内边距确保边缘单元格完整显示 */
-            padding: 20px;
-            box-sizing: border-box;
-        }
-        
-        #minefield {
-            position: absolute;
-            border-collapse: collapse;
-            table-layout: fixed;
-            /* 确保表格从容器内边距开始渲染 */
-            left: 20px;
-            top: 20px;
-        }
-        
-        .cell {
-            width: var(--cell-size);
-            height: var(--cell-size);
-            min-width: var(--cell-size);
-            min-height: var(--cell-size);
-            max-width: var(--cell-size);
-            max-height: var(--cell-size);
-            border: var(--cell-border);
-            text-align: center;
-            vertical-align: middle;
-            font-weight: bold;
-            font-size: calc(var(--cell-size) * 0.6);
-            background-color: var(--cell-bg);
-            user-select: none;
-            cursor: pointer;
-            box-sizing: border-box;
-            transition: background-color 0.2s;
-        }
-        .cell.revealed {
-            background-color: var(--revealed-bg);
-        }
-        
-        .cell.flagged {
-            background-color: var(--flagged-bg);
-        }
-        
-        .cell.mine {
-            background-color: var(--mine-bg);
-        }
-        
-        .cell.mine::after {
-            content: "💣";
-            font-size: calc(var(--cell-size) * 0.8);
-            line-height: var(--cell-size);
-        }
-        
-        .cell.flagged::after {
-            content: "🚩";
-            font-size: calc(var(--cell-size) * 0.8);
-            line-height: var(--cell-size);
-        }
-        
-        #controls {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 60px;
-            background-color: #333;
+        /* 导航栏 - 使用Playfair Display字体 */
+        .navbar {
+            background-color: #1a3a5f;
             color: white;
+            padding: 15px 0;
             display: flex;
             justify-content: space-around;
-            align-items: center;
-            padding: 0 10px;
-            box-sizing: border-box;
-            z-index: 100;
+            font-family: 'Playfair Display', serif;
+            font-size: 18px;
         }
         
-        #controls button {
-            padding: 8px 16px;
-            background-color: #4CAF50;
+        .navbar a {
             color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 16px;
-            cursor: pointer;
+            text-decoration: none;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 3px;
+            transition: background-color 0.3s;
         }
         
-        #controls button:active {
-            background-color: #3e8e41;
+        .navbar a:hover {
+            background-color: #2a4a6f;
         }
         
-        #stats {
-            font-size: 16px;
-            color: white;
+        .navbar a.active {
+            background-color: #3a5a7f;
         }
         
-        #zoom-controls {
+        /* 内容容器 */
+        .container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        /* 标题 - 使用Playfair Display字体 */
+        h1 {
+            color: #1a3a5f;
+            margin-bottom: 20px;
+            font-family: 'Playfair Display', serif;
+            font-weight: 700;
+        }
+        
+        /* 发布成功页面 */
+        .success-message {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .next-options {
+            margin-top: 30px;
+        }
+        
+        .option {
+            display: block;
+            padding: 10px 15px;
+            margin: 10px 0;
+            color: #1a3a5f;
+            text-decoration: none;
+            position: relative;
+            padding-left: 25px;
+        }
+        
+        .option:before {
+            content: "•";
+            position: absolute;
+            left: 10px;
+            color: black;
+        }
+        
+        /* 发布页面 */
+        .format-buttons {
+            margin-bottom: 15px;
             display: flex;
             gap: 10px;
         }
         
-        #zoom-controls button {
-            width: 40px;
-            height: 40px;
-            font-size: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .format-btn {
+            padding: 5px 10px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: 'Courier Prime', monospace;
         }
         
-        .number-1 { color: blue; }
-        .number-2 { color: green; }
-        .number-3 { color: red; }
-        .number-4 { color: darkblue; }
-        .number-5 { color: brown; }
-        .number-6 { color: teal; }
-        .number-7 { color: black; }
-        .number-8 { color: gray; }
+        /* 文本区域 - 使用Courier Prime等宽字体 */
+        .text-area {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            resize: vertical;
+            margin-bottom: 15px;
+            font-family: 'Courier Prime', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .post-btn-container {
+            text-align: right;
+        }
+        
+        .post-btn {
+            padding: 8px 20px;
+            background-color: #e0e0e0;
+            color: #333;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: 'Playfair Display', serif;
+        }
+        
+        .post-btn:after {
+            content: " ▲";
+            font-size: 12px;
+        }
+        
+        /* 个人主页 */
+        .profile {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        
+        .profile-pic {
+            width: 100px;
+            height: 100px;
+            background-color: #ddd;
+            border-radius: 50%;
+            margin-right: 20px;
+            background-size: cover;
+            background-position: center;
+        }
+        
+        .profile-info h2 {
+            margin-bottom: 10px;
+            color: #1a3a5f;
+            font-family: 'Playfair Display', serif;
+        }
+        
+        .posts {
+            margin-top: 20px;
+        }
+        
+        .post {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            position: relative;
+        }
+        
+        .post-time {
+            color: #777;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            font-style: italic;
+        }
+        
+        /* 帖子内容使用Libre Baskerville字体 */
+        .post-content {
+            font-family: 'Libre Baskerville', serif;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+        
+        /* 删除按钮 */
+        .delete-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: #777;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .delete-btn:hover {
+            color: #d33;
+        }
+        
+        /* 关于页面 */
+        .about-container {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .profile-editable {
+            width: 100%;
+        }
+        
+        .profile-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .avatar-upload {
+            position: relative;
+            margin-right: 20px;
+        }
+        
+        .avatar-edit {
+            position: absolute;
+            right: 5px;
+            bottom: 5px;
+            background: #1a3a5f;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .avatar-preview {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background-color: #ddd;
+            overflow: hidden;
+        }
+        
+        .avatar-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #1a3a5f;
+        }
+        
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        
+        .form-group textarea {
+            height: 150px;
+            resize: vertical;
+        }
+        
+        .save-btn {
+            padding: 10px 20px;
+            background-color: #1a3a5f;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        /* 关于页面 - 查看模式 */
+        .profile-view {
+            display: none;
+        }
+        
+        .profile-view .profile-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .profile-view .avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin-right: 20px;
+            background-size: cover;
+            background-position: center;
+        }
+        
+        .profile-view .username {
+            font-family: 'Playfair Display', serif;
+            font-size: 24px;
+            color: #1a3a5f;
+            margin-bottom: 5px;
+        }
+        
+        .profile-view .tagline {
+            font-style: italic;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .profile-view .bio {
+            line-height: 1.6;
+        }
+        
+        .edit-profile-btn {
+            margin-top: 20px;
+            padding: 8px 16px;
+            background-color: #1a3a5f;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        /* 隐藏页面 */
+        .page {
+            display: none;
+        }
+        
+        .page.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
-    <div id="game-container">
-        <table id="minefield"></table>
+    <!-- 导航栏 -->
+    <div class="navbar">
+        <a href="#" class="nav-link" data-page="welcome">Welcome</a>
+        <a href="#" class="nav-link" data-page="post">Post</a>
+        <a href="#" class="nav-link" data-page="help">Help</a>
+        <a href="#" class="nav-link" data-page="about">About</a>
     </div>
     
-    <div id="controls">
-        <button id="new-game">新游戏</button>
-        <div id="stats">
-            剩余雷数: <span id="mines-left">0</span> | 
-            已标记: <span id="flags-placed">0</span>
+    <!-- 欢迎/个人主页 -->
+    <div class="container page" id="welcome">
+        <div class="profile">
+            <div class="profile-pic" id="welcome-avatar"></div>
+            <div class="profile-info">
+                <h2 id="display-username">Mark Zuckerberg</h2>
+                <p id="display-tagline">Student at Harvard University</p>
+            </div>
         </div>
-        <div id="zoom-controls">
-            <button id="zoom-in">+</button>
-            <button id="zoom-out">-</button>
+        
+        <div class="posts">
+            <h3>My Posts</h3>
+            <div id="posts-container">
+                <!-- 帖子将通过JavaScript动态添加 -->
+            </div>
         </div>
     </div>
-
+    
+    <!-- 发布页面 -->
+    <div class="container page" id="post">
+        <h1>Post to Zuckonit</h1>
+        <div class="format-buttons">
+            <button class="format-btn" onclick="formatText('bold')">B</button>
+            <button class="format-btn" onclick="formatText('italic')">I</button>
+            <button class="format-btn" onclick="formatText('code')">&lt;&gt;</button>
+        </div>
+        <textarea class="text-area" id="post-content" placeholder="What's on your mind?"></textarea>
+        <div class="post-btn-container">
+            <button class="post-btn" onclick="submitPost()">Post</button>
+        </div>
+    </div>
+    
+    <!-- 发布成功页面 -->
+    <div class="container page" id="success">
+        <div class="success-message">
+            <h1>Post Successful!</h1>
+            <p>What do you want to do next?</p>
+        </div>
+        
+        <div class="next-options">
+            <a href="#" class="option" onclick="showPage('welcome')">View my post</a>
+            <a href="#" class="option" onclick="downloadHTML()">Download an HTML file to post at Zuckonit.com</a>
+            <a href="#" class="option" onclick="showPage('post')">Create a new post</a>
+        </div>
+    </div>
+    
+    <!-- 帮助/反馈页面 -->
+    <div class="container page" id="help">
+        <h1>Submit Feedback</h1>
+        <form class="feedback-form" onsubmit="submitFeedback(event)">
+            <div class="form-group">
+                <label for="feedback-name">Your Name</label>
+                <input type="text" id="feedback-name" required>
+            </div>
+            <div class="form-group">
+                <label for="feedback-email">Your Email</label>
+                <input type="email" id="feedback-email" required>
+            </div>
+            <div class="form-group">
+                <label for="feedback-message">Your Feedback</label>
+            <textarea id="feedback-message" required></textarea>
+            </div>
+            <button type="submit" class="save-btn">Submit</button>
+        </form>
+    </div>
+    
+    <!-- 关于页面 -->
+    <div class="container page" id="about">
+        <h1>About Me</h1>
+        <div class="about-container">
+            <!-- 编辑模式 -->
+            <div id="profile-edit" class="profile-editable">
+                <div class="profile-header">
+                    <div class="avatar-upload">
+                        <div class="avatar-preview">
+                            <img src="https://via.placeholder.com/100" id="avatar-preview" alt="Profile Picture">
+                        </div>
+                        <div class="avatar-edit" onclick="document.getElementById('avatar-upload').click()">
+                            <i>✎</i>
+                        </div>
+                        <input type="file" id="avatar-upload" accept="image/*" style="display: none;" onchange="previewAvatar(event)">
+                    </div>
+                    <div class="profile-info-edit">
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" value="Mark Zuckerberg">
+                        </div>
+                        <div class="form-group">
+                            <label for="tagline">Tagline</label>
+                            <input type="text" id="tagline" value="Student at Harvard University">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="bio">Bio</label>
+                    <textarea id="bio">I'm a student at Harvard University and the creator of Zuckonit, the new social network for Harvard students. My interests include programming, psychology, and fencing.</textarea>
+                </div>
+                
+                <button class="save-btn" onclick="saveProfile()">Save Profile</button>
+            </div>
+            
+            <!-- 查看模式 -->
+            <div id="profile-view" class="profile-view">
+                <div class="profile-header">
+                    <div class="avatar" id="profile-view-avatar"></div>
+                    <div>
+                        <div class="username" id="profile-view-username">Mark Zuckerberg</div>
+                        <div class="tagline" id="profile-view-tagline">Student at Harvard University</div>
+                    </div>
+                </div>
+                <div class="bio" id="profile-view-bio">
+                    I'm a student at Harvard University and the creator of Zuckonit, the new social network for Harvard students. My interests include programming, psychology, and fencing.
+                </div>
+                <button class="edit-profile-btn" onclick="editProfile()">Edit Profile</button>
+            </div>
+        </div>
+    </div>
+    
     <script>
-        // 游戏配置
-        const config = {
-            width: 500,   // 地图宽度(单元格数)
-            height: 500,  // 地图高度(单元格数)
-            mines: 10000,  // 雷数(10万颗在移动设备上性能可能不足，改为1万)
-            baseCellSize: 30 // 基础单元格大小(px)
-        };
-        
-        // 当前缩放级别
-        let currentZoom = 1;
-
-        // 游戏状态
-        let gameState = {
-            minefield: null,
-            revealed: null,
-            flagged: null,
-            gameOver: false,
-            firstClick: true,
-            flagsPlaced: 0
-        };
-
-        // 初始化游戏
-        function initGame() {
-            const minefield = document.getElementById('minefield');
-            minefield.innerHTML = '';
+        // 格式化日期时间为 "YYYY.MM.DD hh:mm am/pm" 格式
+        function formatDateTime(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
             
-            // 设置单元格大小
-            updateCellSize();
+            let hours = date.getHours();
+            const ampm = hours >= 12 ? 'pm' : 'am';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // 0小时转换为12
+            const minutes = String(date.getMinutes()).padStart(2, '0');
             
-            // 创建游戏状态数组
-            gameState.minefield = new Array(config.height);
-            gameState.revealed = new Array(config.height);
-            gameState.flagged = new Array(config.height);
-            gameState.flagsPlaced = 0;
-            
-            for (let y = 0; y < config.height; y++) {
-                gameState.minefield[y] = new Array(config.width).fill(0);
-                gameState.revealed[y] = new Array(config.width).fill(false);
-                gameState.flagged[y] = new Array(config.width).fill(false);
-                
-                const row = minefield.insertRow();
-                for (let x = 0; x < config.width; x++) {
-                    const cell = row.insertCell();
-                    cell.className = 'cell';
-                    cell.dataset.x = x;
-                    cell.dataset.y = y;
-                    
-                    // 添加事件监听
-                    cell.addEventListener('click', handleCellClick);
-                    cell.addEventListener('contextmenu', handleRightClick);
-                    cell.addEventListener('touchstart', handleTouchStart, {passive: false});
-                    cell.addEventListener('touchend', handleTouchEnd);
-                }
-            }
-            
-            gameState.gameOver = false;
-            gameState.firstClick = true;
-            updateStats();
-            
-            // 自动滚动到中心
-            setTimeout(() => {
-                const container = document.getElementById('game-container');
-                const minefield = document.getElementById('minefield');
-                
-                // 计算中心位置时考虑内边距
-                const centerX = (container.clientWidth - minefield.offsetWidth) / 2;
-                const centerY = (container.clientHeight - minefield.offsetHeight) / 2;
-                
-                container.scrollTo(centerX, centerY);
-            }, 100);
+            return `${year}.${month}.${day} ${hours}:${minutes}${ampm}`;
         }
         
-        // 更新单元格大小
-        function updateCellSize() {
-            const size = config.baseCellSize * currentZoom;
-            document.documentElement.style.setProperty('--cell-size', `${size}px`);
-        }
-
-        // 放置地雷(确保第一次点击安全)
-        function placeMines(safeX, safeY) {
-            let minesPlaced = 0;
+        // 初始化本地存储
+        if (!localStorage.getItem('posts')) {
+            const now = new Date();
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
             
-            // 创建安全区域(第一次点击周围3x3区域不放雷)
-            const safeZone = [];
-            for (let dy = -1; dy <= 1; dy++) {
-                for (let dx = -1; dx <= 1; dx++) {
-                    const x = safeX + dx;
-                    const y = safeY + dy;
-                    if (x >= 0 && x < config.width && y >= 0 && y < config.height) {
-                        safeZone.push(`${x},${y}`);
-                    }
+            localStorage.setItem('posts', JSON.stringify([
+                {
+                    time: formatDateTime(new Date(now.setHours(20, 13))), // 8:13pm
+                    content: "<p><i>8:13pm</i>. Erica Albright's a bitch. You think that's because her family changed their name from Albrecht or do you think it's because all BU girls are bitches?</p>"
+                },
+                {
+                    time: formatDateTime(yesterday),
+                    content: "<p>Just launched Zuckonit! The new social network for Harvard students.</p>"
                 }
-            }
-            
-            // 随机放置地雷
-            while (minesPlaced < config.mines) {
-                const x = Math.floor(Math.random() * config.width);
-                const y = Math.floor(Math.random() * config.height);
-                
-                // 检查是否在安全区域或已有雷
-                if (!safeZone.includes(`${x},${y}`) && gameState.minefield[y][x] !== -1) {
-                    gameState.minefield[y][x] = -1; // -1表示雷
-                    minesPlaced++;
-                    
-                    // 更新周围单元格的数字
-                    for (let dy = -1; dy <= 1; dy++) {
-                        for (let dx = -1; dx <= 1; dx++) {
-                            const nx = x + dx;
-                            const ny = y + dy;
-                            if (nx >= 0 && nx < config.width && ny >= 0 && ny < config.height && gameState.minefield[ny][nx] !== -1) {
-                                gameState.minefield[ny][nx]++;
-                            }
-                        }
-                    }
-                }
-            }
+            ]));
         }
-
-        // 处理单元格点击
-        function handleCellClick(event) {
-            if (gameState.gameOver) return;
+        
+        // 加载保存的帖子
+        function loadPosts() {
+            const postsContainer = document.getElementById('posts-container');
+            postsContainer.innerHTML = '';
             
-            const cell = event.currentTarget;
-            const x = parseInt(cell.dataset.x);
-            const y = parseInt(cell.dataset.y);
+            const posts = JSON.parse(localStorage.getItem('posts'));
             
-            if (gameState.flagged[y][x]) return;
-            
-            if (gameState.firstClick) {
-                placeMines(x, y);
-                gameState.firstClick = false;
-            }
-            
-            revealCell(x, y);
-            
-            if (gameState.minefield[y][x] === -1) {
-                // 踩到雷，游戏结束
-                gameOver(false);
-            } else if (checkWin()) {
-                // 检查是否胜利
-                gameOver(true);
+            posts.forEach((post, index) => {
+                const postElement = document.createElement('div');
+                postElement.className = 'post';
+                postElement.innerHTML = `
+                    <div class="post-time"><i>${post.time}</i></div>
+                    <div class="post-content">${post.content}</div>
+                    <button class="delete-btn" onclick="deletePost(${index})">✕</button>
+                `;
+                postsContainer.appendChild(postElement);
+            });
+        }
+        
+        // 删除帖子
+        function deletePost(index) {
+            if (confirm('Are you sure you want to delete this post?')) {
+                const posts = JSON.parse(localStorage.getItem('posts'));
+                posts.splice(index, 1);
+                localStorage.setItem('posts', JSON.stringify(posts));
+                loadPosts();
             }
         }
         
-        // 触摸开始处理(用于阻止滚动)
-        function handleTouchStart(event) {
-            if (event.touches.length === 1) {
-                event.preventDefault();
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadPosts();
+            
+            // 检查是否有保存的profile数据
+            if (localStorage.getItem('profile')) {
+                const profile = JSON.parse(localStorage.getItem('profile'));
+                updateProfileDisplay(profile);
             }
-        }
+            
+            // 检查是否有保存的post内容
+            if (localStorage.getItem('draftPost')) {
+                document.getElementById('post-content').value = localStorage.getItem('draftPost');
+            }
+        });
         
-        // 触摸结束处理(模拟右键点击)
-        function handleTouchEnd(event) {
-            if (event.touches.length === 0 && event.changedTouches.length === 1) {
-                const touch = event.changedTouches[0];
-                const element = document.elementFromPoint(touch.clientX, touch.clientY);
-                if (element && element.classList.contains('cell')) {
-                    // 长按视为右键点击
-                    handleRightClick({currentTarget: element, preventDefault: () => {}});
-                }
-            }
-        }
-
-        // 处理右键点击(插旗)
-        function handleRightClick(event) {
-            event.preventDefault();
-            if (gameState.gameOver || gameState.firstClick) return;
-            
-            const cell = event.currentTarget;
-            const x = parseInt(cell.dataset.x);
-            const y = parseInt(cell.dataset.y);
-            
-            if (!gameState.revealed[y][x]) {
-                gameState.flagged[y][x] = !gameState.flagged[y][x];
-                if (gameState.flagged[y][x]) {
-                    gameState.flagsPlaced++;
-                } else {
-                    gameState.flagsPlaced--;
-                }
-                cell.className = gameState.flagged[y][x] ? 'cell flagged' : 'cell';
-                updateStats();
-            }
-        }
-
-        // 揭示单元格
-        function revealCell(x, y) {
-            if (x < 0 || x >= config.width || y < 0 || y >= config.height || 
-                gameState.revealed[y][x] || gameState.flagged[y][x]) {
-                return;
-            }
-            
-            gameState.revealed[y][x] = true;
-            const cell = document.getElementById('minefield').rows[y].cells[x];
-            cell.classList.add('revealed');
-            
-            if (gameState.minefield[y][x] > 0) {
-                // 显示周围雷数
-                cell.textContent = gameState.minefield[y][x];
-                cell.classList.add(`number-${gameState.minefield[y][x]}`);
-            } else if (gameState.minefield[y][x] === 0) {
-                // 如果是空白单元格，自动揭示周围
-                for (let dy = -1; dy <= 1; dy++) {
-                    for (let dx = -1; dx <= 1; dx++) {
-                        if (dx !== 0 || dy !== 0) {
-                            revealCell(x + dx, y + dy);
-                        }
-                    }
-                }
-            }
-        }
-
-        // 游戏结束处理
-        function gameOver(win) {
-            gameState.gameOver = true;
-            
-            // 揭示所有雷
-            for (let y = 0; y < config.height; y++) {
-                for (let x = 0; x < config.width; x++) {
-                    if (gameState.minefield[y][x] === -1) {
-                        const cell = document.getElementById('minefield').rows[y].cells[x];
-                        cell.classList.add('mine');
-                    }
-                }
-            }
-            
-            setTimeout(() => {
-                alert(win ? '恭喜你赢了！' : '游戏结束！你踩到雷了！');
-            }, 100);
-        }
-
-        // 检查是否胜利
-        function checkWin() {
-            let unrevealedSafeCells = 0;
-            
-            for (let y = 0; y < config.height; y++) {
-                for (let x = 0; x < config.width; x++) {
-                    if (!gameState.revealed[y][x] && gameState.minefield[y][x] !== -1) {
-                        unrevealedSafeCells++;
-                    }
-                }
-            }
-            
-            return unrevealedSafeCells === 0;
-        }
-
-        // 更新统计信息
-        function updateStats() {
-            if (gameState.firstClick) {
-                document.getElementById('mines-left').textContent = config.mines;
-                document.getElementById('flags-placed').textContent = '0';
-                return;
-            }
-            
-            document.getElementById('mines-left').textContent = config.mines - gameState.flagsPlaced;
-            document.getElementById('flags-placed').textContent = gameState.flagsPlaced;
-        }
-        
-        // 缩放控制
-        function zoomIn() {
-            if (currentZoom < 2) {
-                currentZoom += 0.1;
-                updateCellSize();
-            }
-        }
-        
-        function zoomOut() {
-            if (currentZoom > 0.5) {
-                currentZoom -= 0.1;
-                updateCellSize();
-            }
-        }
-
-        // 初始化游戏
-        document.getElementById('new-game').addEventListener('click', initGame);
-        document.getElementById('zoom-in').addEventListener('click', zoomIn);
-        document.getElementById('zoom-out').addEventListener('click', zoomOut);
-        
-        // 初始化触摸事件监听器
-        document.addEventListener('touchmove', function(e) {
-            if (e.touches.length === 1) {
+        // 页面导航功能
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
                 e.preventDefault();
-            }
-        }, { passive: false });
+                const pageId = this.getAttribute('data-page');
+                showPage(pageId);
+                
+                // 更新活动导航链接
+                document.querySelectorAll('.nav-link').forEach(nav => {
+                    nav.classList.remove('active');
+                });
+                this.classList.add('active');
+            });
+        });
         
-        initGame();
+        // 显示指定页面
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            document.getElementById(pageId).classList.add('active');
+            
+            // 如果是about页面，检查是否应该显示编辑模式或查看模式
+            if (pageId === 'about') {
+                if (localStorage.getItem('profileSaved')) {
+                    document.getElementById('profile-edit').style.display = 'none';
+                    document.getElementById('profile-view').style.display = 'block';
+                } else {
+                    document.getElementById('profile-edit').style.display = 'block';
+                    document.getElementById('profile-view').style.display = 'none';
+                }
+            }
+        }
+        
+        // 默认显示欢迎页面
+        showPage('welcome');
+        document.querySelector('.nav-link[data-page="welcome"]').classList.add('active');
+        
+        // 文本格式化功能
+        function formatText(type) {
+            const textarea = document.getElementById('post-content');
+            const startPos = textarea.selectionStart;
+            const endPos = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(startPos, endPos);
+            let beforeText, afterText;
+            
+            switch(type) {
+                case 'bold':
+                    beforeText = '<b>';
+                    afterText = '</b>';
+                    break;
+                case 'italic':
+                    beforeText = '<i>';
+                    afterText = '</i>';
+                    break;
+                case 'code':
+                    beforeText = '<code>';
+                    afterText = '</code>';
+                    break;
+                default:
+                    return;
+            }
+            
+            const newText = textarea.value.substring(0, startPos) + 
+                           beforeText + selectedText + afterText + 
+                           textarea.value.substring(endPos);
+            
+            textarea.value = newText;
+            
+            // 恢复光标位置
+            if (selectedText.length > 0) {
+                textarea.setSelectionRange(startPos + beforeText.length, endPos + beforeText.length);
+            } else {
+                textarea.setSelectionRange(startPos + beforeText.length, startPos + beforeText.length);
+            }
+            
+            textarea.focus();
+            
+            // 保存草稿
+            localStorage.setItem('draftPost', textarea.value);
+        }
+        
+        // 提交帖子
+        function submitPost() {
+            const postContent = document.getElementById('post-content').value;
+            const now = new Date();
+            const timeString = formatDateTime(now);
+            
+            // 获取现有帖子
+            const posts = JSON.parse(localStorage.getItem('posts'));
+            
+            // 添加新帖子到数组开头
+            posts.unshift({
+                time: timeString,
+                content: postContent
+            });
+            
+            // 保存到本地存储
+            localStorage.setItem('posts', JSON.stringify(posts));
+            
+            // 清空草稿
+            localStorage.removeItem('draftPost');
+            document.getElementById('post-content').value = '';
+            
+            // 重新加载帖子
+            loadPosts();
+            
+            // 显示成功页面
+            showPage('success');
+        }
+        
+        // 下载HTML文件
+        function downloadHTML() {
+            const postContent = document.getElementById('post-content').value;
+            const blob = new Blob([postContent], {type: 'text/html'});
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'zuckonit-post.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        // 提交反馈
+        function submitFeedback(event) {
+            event.preventDefault();
+            alert('Thank you for your feedback!');
+            event.target.reset();
+        }
+        
+        // 头像预览
+        function previewAvatar(event) {
+            const reader = new FileReader();
+            reader.onload = function() {
+                const output = document.getElementById('avatar-preview');
+                output.src = reader.result;
+                
+                // 更新本地存储中的头像
+                const profile = localStorage.getItem('profile') ? JSON.parse(localStorage.getItem('profile')) : {};
+                profile.avatar = reader.result;
+                localStorage.setItem('profile', JSON.stringify(profile));
+            };
+            reader.readAsDataURL(event.target.files[0]);
+        }
+        
+        // 保存个人资料
+        function saveProfile() {
+            const username = document.getElementById('username').value;
+            const tagline = document.getElementById('tagline').value;
+            const bio = document.getElementById('bio').value;
+            const avatar = document.getElementById('avatar-preview').src;
+            
+            // 创建profile对象
+            const profile = {
+                username,
+                tagline,
+                bio,
+                avatar
+            };
+            
+            // 保存到本地存储
+            localStorage.setItem('profile', JSON.stringify(profile));
+            localStorage.setItem('profileSaved', 'true');
+            
+            // 更新显示
+            updateProfileDisplay(profile);
+            
+            // 切换到查看模式
+            document.getElementById('profile-edit').style.display = 'none';
+            document.getElementById('profile-view').style.display = 'block';
+            
+            alert('Profile saved successfully!');
+        }
+        
+        // 更新个人资料显示
+        function updateProfileDisplay(profile) {
+            // 更新about页面
+            document.getElementById('profile-view-username').textContent = profile.username;
+            document.getElementById('profile-view-tagline').textContent = profile.tagline;
+            document.getElementById('profile-view-bio').textContent = profile.bio;
+            
+            if (profile.avatar) {
+                document.getElementById('profile-view-avatar').style.backgroundImage = `url(${profile.avatar})`;
+            }
+            
+            // 更新welcome页面
+            document.getElementById('display-username').textContent = profile.username;
+            document.getElementById('display-tagline').textContent = profile.tagline;
+            
+            if (profile.avatar) {
+                document.getElementById('welcome-avatar').style.backgroundImage = `url(${profile.avatar})`;
+            }
+        }
+        
+        // 编辑个人资料
+        function editProfile() {
+            const profile = JSON.parse(localStorage.getItem('profile'));
+            
+            // 填充表单
+            document.getElementById('username').value = profile.username;
+            document.getElementById('tagline').value = profile.tagline;
+            document.getElementById('bio').value = profile.bio;
+            
+            if (profile.avatar) {
+                document.getElementById('avatar-preview').src = profile.avatar;
+            }
+            
+            // 切换到编辑模式
+            document.getElementById('profile-edit').style.display = 'block';
+            document.getElementById('profile-view').style.display = 'none';
+        }
+        
+        // 自动保存草稿
+        document.getElementById('post-content').addEventListener('input', function() {
+            localStorage.setItem('draftPost', this.value);
+        });
     </script>
 </body>
 </html>
