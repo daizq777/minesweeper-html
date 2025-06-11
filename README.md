@@ -1,2 +1,2 @@
-# minesweeper-html
-minesweeper game including 100000 mine.
+# zuckonit
+my blog posting what I want to say.
